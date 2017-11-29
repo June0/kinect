@@ -1,5 +1,5 @@
 #include "vrpn_Tracker.h"
-
+#include <Windows.h>
 #include <iostream>
 using namespace std;
 
@@ -51,6 +51,32 @@ bool debounce(bool cond, bool *state) {
 	return return_state;
 }
 
+//Emulate mouse click
+void click(bool pressed)
+{
+	POINT p;
+	GetCursorPos(&p);
+	printf("%d %d\n", p.x, p.y);
+
+	INPUT input;
+	input.type = INPUT_MOUSE;
+	input.mi.dx = p.x;
+	input.mi.dy = p.y;
+	input.mi.dwFlags = (MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_LEFTUP);
+	input.mi.mouseData = 0;
+	input.mi.dwExtraInfo = NULL;
+	input.mi.time = 0;
+
+	
+	if (pressed) {
+		input.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+	}
+	else {
+		input.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+	}
+	SendInput(1, &input, sizeof(INPUT));	
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -64,6 +90,8 @@ int main(int argc, char* argv[])
 	bool left_hand_down = false;
 	bool right_hand_down = false;
 
+	bool paint_is_open = false;
+
 	vrpn_Tracker_Remote *tracker = new vrpn_Tracker_Remote(addr);
 	tracker->register_change_handler(NULL, handle_tracker);
 
@@ -74,7 +102,14 @@ int main(int argc, char* argv[])
 		//Clap
 		if (debounce(abs(left_hand_x - right_hand_x) < clap_threshold && abs(left_hand_y - right_hand_y) < clap_threshold && abs(left_hand_z - right_hand_z) < clap_threshold, &clap)) {
 			printf("Clap\n");
-			system("C:\\WINDOWS\\system32\\mspaint.exe");
+			if (paint_is_open) {
+				system("taskkill /F /IM mspaint.exe");
+				paint_is_open = false;
+			}
+			else {
+				system("start mspaint");
+				paint_is_open = true;
+			}
 		}
 
 		//Arms
@@ -91,6 +126,18 @@ int main(int argc, char* argv[])
 			printf("Right arm DOWN\n");
 		}
 
-		Sleep(100);
+		//Paint
+		if (paint_is_open) {
+			//printf("x:%f y:%f z:%f\n", right_hand_x, right_hand_y, right_hand_z);
+			SetCursorPos((right_hand_x + 1) * 500, (-right_hand_y + 1) * 500);
+			if (left_hand_up) {
+				click(true);
+			}
+			else {
+				click(false);
+			}
+		}
+
+		Sleep(16);
 	}
 }
