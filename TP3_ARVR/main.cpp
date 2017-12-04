@@ -2,6 +2,8 @@
 #include <Windows.h>
 #include <iostream>
 #include <conio.h>
+#include <SFML/Graphics.hpp>
+#include <queue>
 using namespace std;
 
 //Global variables
@@ -14,6 +16,10 @@ float right_hand_z = 0;
 float left_elbow_y = 0;
 float right_elbow_y = 0;
 
+struct Pos {
+	float x;
+	float y;
+};
 
 //Tracker
 void VRPN_CALLBACK handle_tracker(void* userData, const vrpn_TRACKERCB t)
@@ -107,8 +113,12 @@ int main(int argc, char* argv[])
 	bool right_hand_up = false;
 	bool left_hand_down = false;
 	bool right_hand_down = false;
-
 	bool paint_is_open = false;
+	int cursorX = 0;
+	int cursorY = 0;
+
+	deque<Pos> queue_right_hand;
+
 
 	vrpn_Tracker_Remote *tracker = new vrpn_Tracker_Remote(addr);
 	tracker->register_change_handler(NULL, handle_tracker);
@@ -121,13 +131,36 @@ int main(int argc, char* argv[])
 	int hsize = desktop.right;
 	int vsize = desktop.bottom;
 
-	while (1) {
+	sf::RenderWindow window(sf::VideoMode(200, 200), "SFML works!");
+	sf::CircleShape shape(100.f);
+	shape.setFillColor(sf::Color::Green);
+
+	while (window.isOpen()) {
+		//SFML closing
+		sf::Event event;
+		while (window.pollEvent(event))
+		{
+			if (event.type == sf::Event::Closed)
+				window.close();
+		}
+
+		//Emergency stop
 		if (GetKeyState(VK_SPACE) & 0x8000)
 		{
-			return 0; //emergency stop
+			return 0;
 		}
+
 		//Handlers
 		tracker->mainloop();
+
+		Pos pos_right_hand;
+		pos_right_hand.x = right_hand_x;
+		pos_right_hand.y = right_hand_y;
+
+		queue_right_hand.push_front(pos_right_hand);
+		if (queue_right_hand.size() > 10) {
+			queue_right_hand.pop_back();
+		}
 
 		//Clap
 		if (debounce(abs(left_hand_x - right_hand_x) < clap_threshold && abs(left_hand_y - right_hand_y) < clap_threshold && abs(left_hand_z - right_hand_z) < clap_threshold, &clap)) {
@@ -152,14 +185,31 @@ int main(int argc, char* argv[])
 		}
 		if (debounce(right_hand_y - right_elbow_y > arm_threshold, &right_hand_up)) {
 			printf("Right arm UP\n");
+			shape.setFillColor(sf::Color::Red);
 		}
 		if (debounce(right_hand_y - right_elbow_y < -arm_threshold, &right_hand_down)) {
 			printf("Right arm DOWN\n");
+			shape.setFillColor(sf::Color::Blue);
 		}
 
 		//Paint
 		if (paint_is_open) {
-			SetCursorPos((right_hand_x + h_offset) * hsize / h_amplitude, (-right_hand_y + v_offset) * vsize / v_amplitude);
+
+			Pos sum;
+			sum.x = 0;
+			sum.y = 0;
+			for (int i = 0; i < queue_right_hand.size(); i++) {
+				sum.x += queue_right_hand[i].x;
+				sum.y += queue_right_hand[i].y;
+			}
+			//printf("%f, %f", sum.x, sum.y);
+			Pos mean_right_hand;
+			mean_right_hand.x = sum.x / queue_right_hand.size();
+			mean_right_hand.y = sum.y / queue_right_hand.size();
+			
+			cursorX = (mean_right_hand.x + h_offset) * hsize / h_amplitude;
+			cursorY = (-mean_right_hand.y + v_offset) * vsize / v_amplitude;
+			SetCursorPos(cursorX, cursorY);
 			printf("%f %f\n", right_hand_x, right_hand_y);
 			if (left_hand_up) {
 				click(true);
@@ -168,6 +218,11 @@ int main(int argc, char* argv[])
 				click(false);
 			}
 		}
+
+		window.clear();
+		window.draw(shape);
+		window.display();
+
 		Sleep(16);
 	}
 }
