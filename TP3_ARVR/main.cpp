@@ -47,7 +47,7 @@ void VRPN_CALLBACK handle_tracker(void* userData, const vrpn_TRACKERCB t)
 }
 
 //Function to detect state changes
-bool debounce(bool cond, bool *state) {
+bool state_changed(bool cond, bool *state) {
 	bool return_state = cond && !*state;
 	if (cond) {
 		*state = true;
@@ -100,7 +100,7 @@ void GetDesktopResolution(int& hsize, int& vsize)
 
 int main(int argc, char* argv[])
 {
-	char *addr = "Tracker0@172.16.169.10:3883";
+	char *addr = "Tracker0@172.16.169.0:3883";
 
 	float arm_threshold = 0.1;
 	float clap_threshold = 0.1;
@@ -163,7 +163,7 @@ int main(int argc, char* argv[])
 		}
 
 		//Clap
-		if (debounce(abs(left_hand_x - right_hand_x) < clap_threshold && abs(left_hand_y - right_hand_y) < clap_threshold && abs(left_hand_z - right_hand_z) < clap_threshold, &clap)) {
+		if (state_changed(abs(left_hand_x - right_hand_x) < clap_threshold && abs(left_hand_y - right_hand_y) < clap_threshold && abs(left_hand_z - right_hand_z) < clap_threshold, &clap)) {
 			printf("Clap\n");
 			if (paint_is_open) {
 				system("taskkill /F /IM mspaint.exe");
@@ -177,17 +177,17 @@ int main(int argc, char* argv[])
 		}
 
 		//Arms
-		if (debounce(left_hand_y - left_elbow_y > arm_threshold, &left_hand_up)) {
+		if (state_changed(left_hand_y - left_elbow_y > arm_threshold, &left_hand_up)) {
 			printf("Left arm UP\n");
 		}
-		if (debounce(left_hand_y - left_elbow_y < -arm_threshold, &left_hand_down)) {
+		if (state_changed(left_hand_y - left_elbow_y < -arm_threshold, &left_hand_down)) {
 			printf("Left arm DOWN\n");
 		}
-		if (debounce(right_hand_y - right_elbow_y > arm_threshold, &right_hand_up)) {
+		if (state_changed(right_hand_y - right_elbow_y > arm_threshold, &right_hand_up)) {
 			printf("Right arm UP\n");
 			shape.setFillColor(sf::Color::Red);
 		}
-		if (debounce(right_hand_y - right_elbow_y < -arm_threshold, &right_hand_down)) {
+		if (state_changed(right_hand_y - right_elbow_y < -arm_threshold, &right_hand_down)) {
 			printf("Right arm DOWN\n");
 			shape.setFillColor(sf::Color::Blue);
 		}
